@@ -28,6 +28,17 @@ jobs:
                                   # this repo's own submodules (if any are
                                   # added later) are still handled correctly
 
+      # The image bundles a CUDA devel toolchain, a conda env and ~8 GB of
+      # weights; the standard runner's ~14 GB free disk is not enough.
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: false
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
