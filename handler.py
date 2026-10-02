@@ -163,6 +163,12 @@ def handler(job):
     try:
         job_input = job.get("input") or {}
 
+        # Warm-up ping: the pipeline is loaded at import time, so by the time
+        # any job reaches handler() the worker is ready. Returning right away
+        # lets a client wake a worker without paying for a full generation.
+        if job_input.get("warmup"):
+            return {"status": "warm"}
+
         image_base64 = job_input.get("image_base64")
         if not image_base64:
             return {"status": "error", "message": "image_base64 is required in input"}
