@@ -21,6 +21,10 @@ Input (job["input"]):
                       matches the repo's own official usage example.
     texture_size    : int, optional, default 2048. Texture resolution baked
                       into the exported GLB, also passed to to_glb().
+    pipeline_type   : str, optional. "512", "1024", "1024_cascade" (model
+                      default) or "1536_cascade". Lower is much faster.
+    warmup          : bool, optional. If true, return {"status": "warm"}
+                      immediately (wakes a worker without generating).
 
 Output:
     {"status": "success", "glb_gzip_base64": "..."}         (default)
@@ -83,6 +87,8 @@ _MESH_SIMPLIFY_CEILING = 16_777_216
 # *exported* mesh's vertex count — a much smaller number than
 # simplify_target, which operates on the O-Voxel structure beforehand.
 _DEFAULT_DECIMATION_TARGET = 50_000
+# Accepted by Trellis2ImageTo3DPipeline.run(pipeline_type=...); None keeps the model default.
+_PIPELINE_TYPES = {"512", "1024", "1024_cascade", "1536_cascade"}
 _DEFAULT_TEXTURE_SIZE = 2048
 
 # Same preventive payload ceiling pattern used by other RunPod 3D workers in
@@ -177,11 +183,17 @@ def handler(job):
         simplify_target = job_input.get("simplify_target", _MESH_SIMPLIFY_CEILING)
         decimation_target = job_input.get("decimation_target", _DEFAULT_DECIMATION_TARGET)
         texture_size = job_input.get("texture_size", _DEFAULT_TEXTURE_SIZE)
+        # Generation resolution: "512" is several times faster than the default
+        # "1024_cascade" and plenty for assets that get decimated to low poly.
+        pipeline_type = job_input.get("pipeline_type")
+        if pipeline_type is not None and pipeline_type not in _PIPELINE_TYPES:
+            return {"status": "error",
+                    "message": "pipeline_type must be one of %s" % ", ".join(sorted(_PIPELINE_TYPES))}
 
         image = _decode_input_image(image_base64)
 
         with torch.inference_mode():
-            outputs = _pipeline.run(image)
+            outputs = _pipeline.run(image, pipeline_type=pipeline_type)
 
         if not outputs:
             return {"status": "error", "message": "Pipeline produced no output for this image"}
